@@ -1,0 +1,14 @@
+# Copy to .dev.vars for local development. Wrangler reads that file and it is
+# git ignored. In production set these with `wrangler secret put`.
+
+# Public URL, used in email links. Leave it unset locally and the dev server
+# origin is used. In production set it, for example https://dotlog.you.workers.dev
+# AUTH_URL=
+
+# Sender on account email. Without a Brevo key, mail prints in the terminal.
+# Verify this address in Brevo first, no domain needed.
+EMAIL_FROM=dotlog <you@example.com>
+
+# https://app.brevo.com/settings/keys/api, free tier is enough for personal use.
+# Leave empty locally and links and codes print in the terminal.
+BREVO_API_KEY=

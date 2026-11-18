@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The app resets nothing inside the home page, so scope the few base
+   rules the old static page relied on Tailwind preflight for. */
+.home *,
+.home *::before,
+.home *::after {
+	box-sizing: border-box;
+	border-width: 0;
+	border-style: solid;
+	border-color: currentColor;
+}
+
+.home svg {
+	display: block;
+	vertical-align: middle;
+}
+
+.home-page {
+	height: 100%;
+	overflow-x: hidden;
+	overflow-y: auto;
+	background: #1b1b1b;
+	scrollbar-color: #3a3a3a transparent;
+	scrollbar-width: thin;
+}
+
+.home {
+	font-family: Fredoka, system-ui, sans-serif;
+	font-size: 16px;
+	line-height: 1.5;
+	color: #fff8ec;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+.home h1,
+.home h3,
+.home p {
+	margin: 0;
+}
+
+.home a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.home ::selection {
+	background: #ffd23f;
+	color: #1b1b1b;
+}
+
+.home .logo {
+	color: #fff8ec;
+}
+
+.home .tile-shadow {
+	filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.28));
+}
+
+.home .words {
+	container-type: inline-size;
+}
+
+.home .intro {
+	--col: calc((100cqw - 24px) / 2);
+	padding-left: calc((var(--col) - min(230px, var(--col))) / 2 + min(230px, var(--col)) * 0.05);
+}
+
+@media (min-width: 768px) {
+	.home .intro {
+		--col: calc((100cqw - 48px) / 3);
+	}
+}
+
+/* On phones the hero needs less room before the next section. */
+@media (max-width: 639px) {
+	.home .hero {
+		min-height: 72vh;
+		padding-bottom: 3rem;
+	}
+}
+
+.home :focus-visible {
+	outline: 3px solid #ffd23f;
+	outline-offset: 4px;
+	border-radius: 10px;
+}

@@ -1,0 +1,4 @@
+# Keep direct asset paths out of the address bar.
+/landing.html / 301
+/terms.html /terms 301
+/index.html / 301

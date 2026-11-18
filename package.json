@@ -1,0 +1,36 @@
+{
+  "name": "dotlog",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/d1-config.mjs",
+    "preview": "vite preview",
+    "home:css": "pnpm dlx tailwindcss@3.4.17 -c tailwind.home.config.cjs -i tailwind.home.css -o src/home.css --minify",
+    "deploy": "pnpm build && wrangler deploy",
+    "db:create": "wrangler d1 create dotlog",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "boring-avatars": "^2.0.4",
+    "fuse.js": "^7.0.0",
+    "hono": "^4.13.18",
+    "idb": "^8.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router": "^8.5.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.69.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "wrangler": "^4.160.1"
+  }
+}
