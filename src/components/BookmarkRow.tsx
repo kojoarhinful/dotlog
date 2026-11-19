@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
   ArrowUpRight,
@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { shortDate } from '../lib/format'
+import { isStoredIcon } from '../lib/icon'
 import { useStore } from '../lib/store'
 import type { Bookmark } from '../lib/types'
 import { hostOf, initialOf, tintFor } from '../lib/url'
@@ -31,6 +32,10 @@ export function BookmarkRow({ bookmark }: Props) {
   const confirming = useStore((s) => s.confirmId === bookmark.id)
 
   const [brokenIcon, setBrokenIcon] = useState(false)
+  const icon = useMemo(
+    () => (isStoredIcon(bookmark.favicon) ? bookmark.favicon : ''),
+    [bookmark.favicon],
+  )
   // Touch has no hover, so a tap walks the row up: dots, then actions.
   const [stage, setStage] = useState(0)
   const [above, setAbove] = useState(false)
@@ -111,9 +116,9 @@ export function BookmarkRow({ bookmark }: Props) {
       aria-label={`Open ${title}`}
     >
       <span className="row-icon">
-        {bookmark.favicon && !brokenIcon ? (
+        {icon && !brokenIcon ? (
           <img
-            src={bookmark.favicon}
+            src={icon}
             alt=""
             loading="lazy"
             referrerPolicy="no-referrer"

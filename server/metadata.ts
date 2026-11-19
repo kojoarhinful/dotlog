@@ -1,21 +1,28 @@
 /**
  * Reads the Open Graph tags from a link so the client does not have to fight
- * CORS. Used by the Vite dev/preview middleware; the same function can sit
- * behind a small serverless endpoint in production.
+ * CORS. The icon is downloaded once here, so the browser never has to ask a
+ * saved site for it again.
  */
+
+import { toBase64 } from './crypto'
 
 export type LinkMetadata = {
   url: string
   title: string
   description: string
-  image: string
   favicon: string
   siteName: string
 }
 
 const TIMEOUT_MS = 8_000
+const ICON_TIMEOUT_MS = 4_000
 const MAX_REDIRECTS = 4
 const MAX_BYTES = 400_000
+const MAX_ICON_BYTES = 64_000
+const MAX_ICON_CANDIDATES = 4
+const PAGE_AGENT = 'Mozilla/5.0 (compatible; BookmarksBot/1.0)'
+const ICON_ACCEPT =
+  'image/png,image/jpeg,image/gif,image/webp,image/x-icon,image/vnd.microsoft.icon'
 
 const NAMED: Record<string, string> = {
   amp: '&',
@@ -69,11 +76,6 @@ function resolveUrl(value: string, base: URL): string {
   }
 }
 
-/** Only remote images are useful here; inline data URIs just render blank. */
-function httpOnly(value: string): string {
-  return /^https?:\/\//i.test(value) ? value : ''
-}
-
 function privateHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
   if (!host) return true
@@ -107,6 +109,48 @@ export function normalizeUrl(input: string): string | null {
   }
 }
 
+/**
+ * Follows redirects by hand so every hop gets the same address check. The
+ * deadline covers the whole chain, not each request.
+ */
+async function follow(
+  start: URL,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<{ response: Response; final: URL }> {
+  const deadline = Date.now() + timeoutMs
+  let current = start
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (current.protocol !== 'http:' && current.protocol !== 'https:') {
+      throw new Error('That address is not reachable from here.')
+    }
+    if (privateHost(current.hostname)) {
+      throw new Error('That address is not reachable from here.')
+    }
+
+    const left = deadline - Date.now()
+    if (left <= 0) throw new Error('That link took too long to answer.')
+
+    const response = await fetch(current, {
+      redirect: 'manual',
+      headers,
+      signal: AbortSignal.timeout(left),
+    })
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      if (!location) throw new Error('The page redirected without a destination.')
+      current = new URL(location, current)
+      continue
+    }
+
+    return { response, final: current }
+  }
+
+  throw new Error('Too many redirects.')
+}
+
 /** Reads at most MAX_BYTES off the wire instead of trusting the page. */
 async function readCapped(response: Response): Promise<string> {
   if (!response.body) return ''
@@ -129,7 +173,10 @@ async function readCapped(response: Response): Promise<string> {
   return html + decoder.decode()
 }
 
-function parseMetadata(html: string, base: URL): LinkMetadata {
+function parseMetadata(
+  html: string,
+  base: URL,
+): { title: string; description: string; siteName: string; icons: string[] } {
   const titleTag = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? ''
   const title =
     metaContent(html, 'og:title') ||
@@ -141,37 +188,131 @@ function parseMetadata(html: string, base: URL): LinkMetadata {
     metaContent(html, 'twitter:description') ||
     metaContent(html, 'description')
 
-  const image = httpOnly(
-    resolveUrl(
-      metaContent(html, 'og:image') ||
-        metaContent(html, 'og:image:url') ||
-        metaContent(html, 'twitter:image'),
-      base,
-    ),
-  )
-
-  let favicon = ''
+  const apple: string[] = []
+  const other: string[] = []
   for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = attr(tag, 'rel') ?? ''
-    if (!/\bicon\b/i.test(rel)) continue
+    const rel = (attr(tag, 'rel') ?? '').toLowerCase()
     const href = attr(tag, 'href')
     if (!href) continue
-    favicon = resolveUrl(href, base)
-    if (favicon) break
+    if (rel.includes('apple-touch-icon')) {
+      apple.push(resolveUrl(href, base))
+    } else if (rel.split(/\s+/).includes('icon')) {
+      other.push(resolveUrl(href, base))
+    }
   }
-  if (!favicon) favicon = resolveUrl('/favicon.ico', base)
-  favicon = httpOnly(favicon)
+
+  const declared = [
+    ...new Set([...apple, ...other].filter((url) => /^https?:\/\//i.test(url))),
+  ].slice(0, MAX_ICON_CANDIDATES - 1)
+
+  const fallback = resolveUrl('/favicon.ico', base)
+  const icons =
+    fallback && !declared.includes(fallback) ? [...declared, fallback] : declared
 
   const siteName = metaContent(html, 'og:site_name') || base.hostname.replace(/^www\./, '')
 
   return {
-    url: base.toString(),
     title: title.slice(0, 300),
     description: description.slice(0, 600),
-    image,
-    favicon,
     siteName,
+    icons,
   }
+}
+
+/** Trusts the file's first bytes, not the headers, which pages often get wrong. */
+function imageType(bytes: Uint8Array): string | null {
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return 'image/png'
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return 'image/gif'
+  }
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return 'image/webp'
+  }
+  if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && bytes[3] === 0) {
+    return 'image/x-icon'
+  }
+  return null
+}
+
+async function readIcon(response: Response): Promise<string | null> {
+  if ((response.headers.get('content-type') ?? '').includes('svg')) return null
+  if (!response.body) return null
+
+  const declared = Number(response.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > MAX_ICON_BYTES) return null
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (size + value.byteLength > MAX_ICON_BYTES) {
+        await reader.cancel().catch(() => {})
+        return null
+      }
+      chunks.push(value)
+      size += value.byteLength
+    }
+  } catch {
+    return null
+  } finally {
+    await reader.cancel().catch(() => {})
+  }
+
+  if (size === 0) return null
+
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  const type = imageType(bytes)
+  if (!type) return null
+  return `data:${type};base64,${toBase64(bytes)}`
+}
+
+/** Tries each candidate inside one shared budget. A slow icon loses to the title. */
+async function fetchIcon(urls: string[]): Promise<string> {
+  const deadline = Date.now() + ICON_TIMEOUT_MS
+
+  for (const candidate of urls) {
+    const left = deadline - Date.now()
+    if (left < 500) break
+    try {
+      const { response } = await follow(
+        new URL(candidate),
+        { 'user-agent': PAGE_AGENT, accept: ICON_ACCEPT },
+        left,
+      )
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {})
+        continue
+      }
+      const icon = await readIcon(response)
+      if (icon) return icon
+    } catch {
+      // Try the next icon instead of failing the whole preview.
+    }
+  }
+
+  return ''
 }
 
 function youtubeVideo(url: URL): string | null {
@@ -197,7 +338,7 @@ function youtubeVideo(url: URL): string | null {
 
 /**
  * YouTube answers bot user agents with 429 on watch pages. Its oEmbed API
- * still returns the title, channel and thumbnail, so videos come through.
+ * still returns the title and channel, so videos come through.
  */
 async function fetchYouTube(page: URL, id: string): Promise<LinkMetadata> {
   const endpoint = new URL('https://www.youtube.com/oembed')
@@ -212,15 +353,15 @@ async function fetchYouTube(page: URL, id: string): Promise<LinkMetadata> {
 
   const data = (await response.json().catch(() => ({}))) as {
     title?: string
-    thumbnail_url?: string
   }
+
+  const favicon = await fetchIcon(['https://www.youtube.com/favicon.ico'])
 
   return {
     url: page.toString(),
     title: (data.title ?? '').slice(0, 300),
     description: '',
-    image: httpOnly(data.thumbnail_url ?? ''),
-    favicon: 'https://www.youtube.com/favicon.ico',
+    favicon,
     siteName: 'YouTube',
   }
 }
@@ -229,47 +370,41 @@ export async function fetchMetadata(input: string): Promise<LinkMetadata> {
   const normalized = normalizeUrl(input)
   if (!normalized) throw new Error('Enter a valid http or https address.')
 
-  let current = new URL(normalized)
+  const page = new URL(normalized)
 
-  const video = youtubeVideo(current)
+  const video = youtubeVideo(page)
   if (video) {
-    if (privateHost(current.hostname)) {
+    if (privateHost(page.hostname)) {
       throw new Error('That address is not reachable from here.')
     }
-    return fetchYouTube(current, video)
+    return fetchYouTube(page, video)
   }
 
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (privateHost(current.hostname)) {
-      throw new Error('That address is not reachable from here.')
-    }
+  const { response, final } = await follow(
+    page,
+    {
+      'user-agent': PAGE_AGENT,
+      accept: 'text/html,application/xhtml+xml',
+    },
+    TIMEOUT_MS,
+  )
 
-    const response = await fetch(current, {
-      redirect: 'manual',
-      headers: {
-        'user-agent': 'Mozilla/5.0 (compatible; BookmarksBot/1.0)',
-        accept: 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
+  if (!response.ok) throw new Error(`The page returned ${response.status}.`)
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location')
-      if (!location) throw new Error('The page redirected without a destination.')
-      current = new URL(location, current)
-      continue
-    }
-
-    if (!response.ok) throw new Error(`The page returned ${response.status}.`)
-
-    const type = response.headers.get('content-type') ?? ''
-    if (!type.includes('text/html') && !type.includes('application/xhtml')) {
-      throw new Error('That link is not a web page.')
-    }
-
-    const html = await readCapped(response)
-    return parseMetadata(html, current)
+  const type = response.headers.get('content-type') ?? ''
+  if (!type.includes('text/html') && !type.includes('application/xhtml')) {
+    throw new Error('That link is not a web page.')
   }
 
-  throw new Error('Too many redirects.')
+  const html = await readCapped(response)
+  const info = parseMetadata(html, final)
+  const favicon = await fetchIcon(info.icons)
+
+  return {
+    url: final.toString(),
+    title: info.title,
+    description: info.description,
+    favicon,
+    siteName: info.siteName,
+  }
 }
