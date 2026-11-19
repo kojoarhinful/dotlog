@@ -30,7 +30,7 @@ const folders = [
 		front: "#FF9BFF",
 		rotate: -6,
 		name: "fetch",
-		copy: "pulls the title and image.",
+		copy: "pulls the title and icon.",
 	},
 	{
 		icon: "i-branch",
@@ -445,13 +445,21 @@ export function Home() {
 							</a>
 						</p>
 						<p className="mt-2 text-paper/40">
+							<a
+								href="https://github.com/kojoarhinful/dotlog"
+								target="_blank"
+								rel="noopener"
+								className="underline underline-offset-4 decoration-dashed hover:text-paper"
+							>
+								open source
+							</a>
+							. &copy; 2026 {BRAND}. All rights reserved. Read on{" "}
 							<Link
 								to="/terms"
 								className="underline underline-offset-4 decoration-dashed hover:text-paper"
 							>
-								terms
-							</Link>{" "}
-							&middot; &copy; 2026 {BRAND}
+								Terms
+							</Link>
 						</p>
 					</div>
 				</footer>
