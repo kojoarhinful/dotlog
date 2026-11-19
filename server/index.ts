@@ -3,8 +3,10 @@ import { authRoutes } from './auth'
 import { dataRoutes } from './data'
 import { ensureSchema } from './db'
 import type { Env } from './db'
+import { sha256Hex } from './crypto'
 import { fetchMetadata } from './metadata'
 import { configuredOrigin } from './origin'
+import { limited } from './rate'
 
 type App = { Bindings: Env }
 
@@ -42,6 +44,12 @@ app.post('/api/metadata', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { url?: unknown }
   if (typeof body.url !== 'string') {
     return c.json({ error: 'Send a url.' }, 400)
+  }
+
+  const address = c.req.header('cf-connecting-ip') ?? 'unknown'
+  const key = `preview:${await sha256Hex(address)}`
+  if (await limited(c.env.DB, key, 60, 10 * 60_000)) {
+    return c.json({ error: 'Too many links. Wait a few minutes.' }, 429)
   }
 
   c.header('cache-control', 'no-store')
