@@ -24,7 +24,7 @@ export function Terms() {
 
       <main>
         <h1>Terms</h1>
-        <p className="doc-date">Effective November 16, 2026</p>
+        <p className="doc-date">Effective November 19, 2026</p>
 
         <h2>What {BRAND} is</h2>
         <p>
@@ -43,6 +43,17 @@ export function Terms() {
           </a>
           .
         </p>
+        <p>
+          {BRAND} is open source. You can read the code at{' '}
+          <a
+            href="https://github.com/kojoarhinful/dotlog"
+            target="_blank"
+            rel="noopener"
+          >
+            github.com/kojoarhinful/dotlog
+          </a>
+          .
+        </p>
 
         <h2>Using {BRAND}</h2>
         <p>
@@ -54,6 +65,12 @@ export function Terms() {
         <p>
           Your titles, links, notes, tags, and branch names belong to you. We store
           them only in encrypted form. We don't sell them, and we can't read them.
+        </p>
+        <p>
+          Only the contents are encrypted. The server can see your email address,
+          when your account was created, when each record was last changed, and how
+          many records you have. It cannot see what you save: titles, links, notes,
+          or branch names.
         </p>
         <p>
           Passwords are stretched with PBKDF2-SHA256 (600,000 iterations), and every
@@ -80,17 +97,19 @@ export function Terms() {
         <h2>Fetch (link previews)</h2>
         <p>
           Fetch is optional. When you use it, your browser sends the link to our
-          server, which opens the page to read its title and image. Cloudflare
+          server, which opens the page to read its title and icon. Cloudflare
           handles that request, so Cloudflare sees the link while it is being read.
           We don't store it, sell it, or use it to track you, and we can't tell
-          whether you went on to save that link. Don't use Fetch to attack, scan, or
-          overload other sites or our servers, or to reach private or internal
-          addresses. Don't use {BRAND} to store or share anything illegal.
+          whether you went on to save that link. To prevent abuse, we keep a
+          short-lived counter keyed by a hash of your IP address. Don't use Fetch
+          to attack, scan, or overload other sites or our servers, or to reach
+          private or internal addresses. Don't use {BRAND} to store or share
+          anything illegal.
         </p>
         <p>
-          A saved favicon is loaded from its original site when your log renders,
-          so that site sees your IP address at that point. The browser sends no
-          referrer, so it does not learn which {BRAND} page you are on.
+          The icon is read once when you use Fetch, then stored with the bookmark in
+          encrypted form. When your log loads, your browser does not contact the
+          sites you saved. Opening a bookmark still visits that site, of course.
         </p>
 
         <h2>Sign-in email</h2>

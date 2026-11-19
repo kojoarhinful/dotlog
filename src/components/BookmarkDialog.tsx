@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 import { BranchPicker } from './BranchPicker'
+import { isStoredIcon, shrinkIcon } from '../lib/icon'
 import { readLink } from '../lib/metadata'
 import { useStore } from '../lib/store'
 import { messageOf } from '../lib/errors'
@@ -26,8 +27,9 @@ export function BookmarkDialog() {
     editing?.branchId ?? (dialog?.mode === 'add' ? activeBranch : null),
   )
 
-  const [image, setImage] = useState(editing?.image ?? '')
-  const [favicon, setFavicon] = useState(editing?.favicon ?? '')
+  const [favicon, setFavicon] = useState(
+    editing?.favicon && isStoredIcon(editing.favicon) ? editing.favicon : '',
+  )
   const [siteName, setSiteName] = useState(editing?.siteName ?? '')
 
   const [fetching, setFetching] = useState(false)
@@ -51,8 +53,7 @@ export function BookmarkDialog() {
       if (data.title) setTitle(data.title)
       if (data.description) setDescription(data.description)
       if (data.siteName) setSiteName(data.siteName)
-      setImage(data.image)
-      setFavicon(data.favicon)
+      setFavicon(data.favicon ? await shrinkIcon(data.favicon) : '')
     } catch (problem) {
       setError(messageOf(problem, 'Could not fetch that remote.'))
     } finally {
@@ -102,8 +103,8 @@ export function BookmarkDialog() {
       title: title.trim() || hostOf(target),
       description: description.trim(),
       branchId: branchId || null,
-      image,
-      favicon,
+      image: '',
+      favicon: isStoredIcon(favicon) ? favicon : '',
       siteName,
     }
 
