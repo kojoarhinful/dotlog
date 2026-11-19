@@ -742,6 +742,7 @@ authRoutes.post('/recover/complete', async (c) => {
   await savePassword(c.env.DB, user.id, keys)
 
   await c.env.DB.prepare('DELETE FROM auth_tokens WHERE userId = ?').bind(user.id).run()
+  await c.env.DB.prepare('DELETE FROM auth_sessions WHERE userId = ?').bind(user.id).run()
   await startSession(c, user.id)
 
   return c.json({ user: publicUser(user) })
@@ -767,6 +768,7 @@ authRoutes.post('/recover/wipe', async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM bookmarks WHERE userId = ?').bind(user.id),
     c.env.DB.prepare('DELETE FROM branches WHERE userId = ?').bind(user.id),
+    c.env.DB.prepare('DELETE FROM auth_sessions WHERE userId = ?').bind(user.id),
   ])
 
   await c.env.DB.prepare(
