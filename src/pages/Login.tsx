@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Avatar } from "../components/Avatar";
+import { PasswordInput } from "../components/PasswordInput";
 import { post } from "../lib/api";
 import { readGuestSeed } from "../lib/avatar";
 import { useAuth } from "../lib/auth";
@@ -95,8 +96,7 @@ export function Login() {
 							/>
 						</div>
 						<div className="auth-field">
-							<input
-								type="password"
+							<PasswordInput
 								value={password}
 								autoComplete="current-password"
 								aria-label="Password"

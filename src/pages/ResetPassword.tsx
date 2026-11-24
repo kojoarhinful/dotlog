@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { Avatar } from '../components/Avatar'
+import { PasswordInput } from '../components/PasswordInput'
 import { BRAND } from '../lib/brand'
 import { api, post } from '../lib/api'
 import { readGuestSeed } from '../lib/avatar'
@@ -275,8 +276,7 @@ export function ResetPassword() {
               />
             </div>
             <div className="auth-field">
-              <input
-                type="password"
+              <PasswordInput
                 value={password}
                 autoComplete="new-password"
                 aria-label="New password"
@@ -288,8 +288,7 @@ export function ResetPassword() {
               />
             </div>
             <div className="auth-field">
-              <input
-                type="password"
+              <PasswordInput
                 value={confirm}
                 autoComplete="new-password"
                 aria-label="Confirm new password"
@@ -333,8 +332,7 @@ export function ResetPassword() {
             </p>
 
             <div className="auth-field">
-              <input
-                type="password"
+              <PasswordInput
                 value={password}
                 autoComplete="new-password"
                 autoFocus
@@ -347,8 +345,7 @@ export function ResetPassword() {
               />
             </div>
             <div className="auth-field">
-              <input
-                type="password"
+              <PasswordInput
                 value={confirm}
                 autoComplete="new-password"
                 aria-label="Confirm new password"
