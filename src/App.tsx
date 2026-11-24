@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	Archive,
 	Bookmark as BookmarkIcon,
@@ -17,9 +18,10 @@ import { BranchSection } from "./components/BranchSection";
 import { Logo } from "./components/Logo";
 import { Profile } from "./components/Profile";
 import { SearchBox } from "./components/SearchBox";
+import { useIconRefresh } from "./hooks/useIconRefresh";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useScrollLock } from "./hooks/useScrollLock";
 import { descendantsOf } from "./lib/branches";
-import { shrinkIcon } from "./lib/icon";
-import { readLink } from "./lib/metadata";
 import type { AuthUser } from "./lib/auth";
 import { LOCKUP } from "./lib/brand";
 import { useStore } from "./lib/store";
@@ -32,41 +34,72 @@ const TABS: { id: Filter; label: string; icon: typeof BookmarkIcon }[] = [
 	{ id: "stashed", label: "Stashed", icon: Archive },
 ];
 
+const COPY: Record<Filter, { status: string; empty: string }> = {
+	all: { status: "", empty: "Your commits show up here." },
+	unread: {
+		status: "unreviewed",
+		empty: "Commits you have not reviewed yet show up here.",
+	},
+	read: {
+		status: "reviewed",
+		empty: "Mark a commit as reviewed and it shows up here.",
+	},
+	stashed: { status: "stashed", empty: "Commits you stash show up here." },
+};
+
 export function App({ user }: { user: AuthUser }) {
-	const ready = useStore((s) => s.ready);
-	const bookmarks = useStore((s) => s.bookmarks);
-	const branches = useStore((s) => s.branches);
-	const filter = useStore((s) => s.filter);
-	const branch = useStore((s) => s.branch);
-	const searchOpen = useStore((s) => s.searchOpen);
-	const helpOpen = useStore((s) => s.helpOpen);
-	const dialog = useStore((s) => s.dialog);
-	const branchDialog = useStore((s) => s.branchDialog);
-	const toast = useStore((s) => s.toast);
-	const load = useStore((s) => s.load);
-	const reset = useStore((s) => s.reset);
-	const sync = useStore((s) => s.sync);
-	const setFilter = useStore((s) => s.setFilter);
-	const setBranch = useStore((s) => s.setBranch);
-	const openAdd = useStore((s) => s.openAdd);
-	const openSearch = useStore((s) => s.openSearch);
-	const openHelp = useStore((s) => s.openHelp);
-	const closeHelp = useStore((s) => s.closeHelp);
-	const openEdit = useStore((s) => s.openEdit);
-	const toggleRead = useStore((s) => s.toggleRead);
-	const askStash = useStore((s) => s.askStash);
-	const restore = useStore((s) => s.restore);
-	const cancelStash = useStore((s) => s.cancelStash);
-	const confirmId = useStore((s) => s.confirmId);
-	const clearToast = useStore((s) => s.clearToast);
-	const notify = useStore((s) => s.notify);
+	const {
+		ready,
+		bookmarks,
+		branches,
+		filter,
+		branch,
+		searchOpen,
+		dialog,
+		branchDialog,
+		toast,
+	} = useStore(
+		useShallow((s) => ({
+			ready: s.ready,
+			bookmarks: s.bookmarks,
+			branches: s.branches,
+			filter: s.filter,
+			branch: s.branch,
+			searchOpen: s.searchOpen,
+			dialog: s.dialog,
+			branchDialog: s.branchDialog,
+			toast: s.toast,
+		})),
+	);
+
+	const {
+		load,
+		reset,
+		sync,
+		setFilter,
+		setBranch,
+		openAdd,
+		openSearch,
+		clearToast,
+	} = useStore(
+		useShallow((s) => ({
+			load: s.load,
+			reset: s.reset,
+			sync: s.sync,
+			setFilter: s.setFilter,
+			setBranch: s.setBranch,
+			openAdd: s.openAdd,
+			openSearch: s.openSearch,
+			clearToast: s.clearToast,
+		})),
+	);
 
 	const lastRow = useRef<string | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [refreshing, setRefreshing] = useState(false);
-	const [refreshDone, setRefreshDone] = useState(0);
-	const [refreshTotal, setRefreshTotal] = useState(0);
-	const refreshStop = useRef(false);
+	const icons = useIconRefresh(user.id);
+
+	useKeyboardShortcuts();
+	useScrollLock(!!dialog || !!branchDialog || searchOpen || menuOpen);
 
 	useEffect(() => {
 		reset();
@@ -90,24 +123,6 @@ export function App({ user }: { user: AuthUser }) {
 	}, [sync]);
 
 	useEffect(() => {
-		if (!dialog && !branchDialog && !searchOpen) return;
-		const previous = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-		return () => {
-			document.body.style.overflow = previous;
-		};
-	}, [branchDialog, dialog, searchOpen]);
-
-	useEffect(() => {
-		if (!menuOpen) return;
-		const previous = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-		return () => {
-			document.body.style.overflow = previous;
-		};
-	}, [menuOpen]);
-
-	useEffect(() => {
 		if (dialog) {
 			const row = (
 				document.activeElement as HTMLElement | null
@@ -122,189 +137,6 @@ export function App({ user }: { user: AuthUser }) {
 			document.querySelector<HTMLElement>(`[data-bm="${id}"]`)?.focus(),
 		);
 	}, [dialog]);
-
-	useEffect(() => {
-		const onKey = (event: KeyboardEvent) => {
-			const target = event.target as HTMLElement | null;
-			const typing =
-				!!target &&
-				(target.tagName === "INPUT" ||
-					target.tagName === "TEXTAREA" ||
-					target.isContentEditable);
-
-			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-				event.preventDefault();
-				if (!dialog) openSearch();
-				return;
-			}
-
-			if (typing || dialog || branchDialog || searchOpen) return;
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-			if (event.key === "?") {
-				event.preventDefault();
-				if (helpOpen) closeHelp();
-				else openHelp();
-				return;
-			}
-
-			if (event.key === "/") {
-				event.preventDefault();
-				openSearch();
-				return;
-			}
-
-			if (event.key === "Escape" && confirmId) {
-				event.preventDefault();
-				const id = confirmId;
-				cancelStash();
-				requestAnimationFrame(() =>
-					document.querySelector<HTMLElement>(`[data-bm="${id}"]`)?.focus(),
-				);
-				return;
-			}
-
-			const row = target?.closest<HTMLElement>(".row") ?? null;
-			const rowId = row?.dataset.bm;
-
-			if (event.key.toLowerCase() === "c") {
-				event.preventDefault();
-				openAdd();
-				return;
-			}
-
-			const step = event.key.toLowerCase();
-			if (step === "j" || step === "k") {
-				event.preventDefault();
-				const rows = Array.from(
-					document.querySelectorAll<HTMLElement>(".row[data-bm]"),
-				);
-				if (!rows.length) return;
-				const current = row ? rows.indexOf(row) : -1;
-				const next =
-					step === "j"
-						? current < 0
-							? 0
-							: Math.min(current + 1, rows.length - 1)
-						: current < 0
-							? rows.length - 1
-							: Math.max(current - 1, 0);
-				const el = rows[next];
-				el.focus({ preventScroll: true });
-				// Glide when crossing an edge instead of snapping by one row.
-				const reduced = window.matchMedia(
-					"(prefers-reduced-motion: reduce)",
-				).matches;
-				el.scrollIntoView({
-					block: "nearest",
-					behavior: reduced ? "auto" : "smooth",
-				});
-				return;
-			}
-
-			if (!rowId) return;
-
-			if (step === "r") {
-				event.preventDefault();
-				void toggleRead(rowId);
-			} else if (step === "e") {
-				event.preventDefault();
-				openEdit(rowId);
-			} else if (step === "s") {
-				event.preventDefault();
-				if (filter === "stashed") void restore(rowId);
-				else askStash(rowId);
-			}
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [
-		askStash,
-		branchDialog,
-		cancelStash,
-		confirmId,
-		dialog,
-		filter,
-		helpOpen,
-		openAdd,
-		openEdit,
-		openHelp,
-		closeHelp,
-		openSearch,
-		restore,
-		searchOpen,
-		toggleRead,
-	]);
-
-	/**
-	 * Reads every commit again and keeps the new icon. Titles and notes are left
-	 * alone, so this only touches favicons and only writes when one changed.
-	 */
-	const refreshIcons = async () => {
-		if (refreshing) return;
-
-		const targets = useStore.getState().bookmarks.filter((item) => !!item.url);
-		if (targets.length === 0) {
-			notify("No commits to refresh yet.");
-			return;
-		}
-
-		refreshStop.current = false;
-		setRefreshing(true);
-		setRefreshDone(0);
-		setRefreshTotal(targets.length);
-
-		let changed = 0;
-		let failed = 0;
-		let stopped = false;
-
-		for (const [index, item] of targets.entries()) {
-			if (refreshStop.current) {
-				stopped = true;
-				break;
-			}
-
-			try {
-				const data = await readLink(item.url);
-				const icon = data.favicon ? await shrinkIcon(data.favicon) : "";
-				if (icon && icon !== item.favicon) {
-					await useStore.getState().update(item.id, { favicon: icon });
-					changed += 1;
-				}
-			} catch (problem) {
-				const message = problem instanceof Error ? problem.message : "";
-				if (message.startsWith("Too many links")) {
-					stopped = true;
-					break;
-				}
-				failed += 1;
-			}
-
-			setRefreshDone(index + 1);
-
-			// One at a time keeps the server and the sites happy.
-			await new Promise((resolve) => window.setTimeout(resolve, 150));
-		}
-
-		setRefreshing(false);
-
-		if (stopped) {
-			notify(
-				refreshStop.current
-					? `Stopped. ${changed} icons refreshed.`
-					: `Link limit reached. ${changed} icons refreshed, try again later.`,
-			);
-			return;
-		}
-
-		if (failed > 0) {
-			notify(`${changed} icons refreshed, ${failed} could not be read.`);
-		} else if (changed === 0) {
-			notify("All icons are already up to date.");
-		} else {
-			notify(`${changed} icons refreshed.`);
-		}
-	};
 
 	const counts = useMemo(() => {
 		const live = bookmarks.filter((item) => !item.archived);
@@ -347,32 +179,8 @@ export function App({ user }: { user: AuthUser }) {
 				? `add-${dialog.url ?? "blank"}`
 				: "none";
 
-	const label =
-		filter === "all"
-			? "All commits"
-			: filter === "unread"
-				? "Unreviewed"
-				: filter === "read"
-					? "Reviewed"
-					: "Stashed";
-
-	const statusWord =
-		filter === "unread"
-			? "unreviewed"
-			: filter === "read"
-				? "reviewed"
-				: filter === "stashed"
-					? "stashed"
-					: "";
-
-	const emptyHint =
-		filter === "unread"
-			? "Commits you have not reviewed yet show up here."
-			: filter === "read"
-				? "Mark a commit as reviewed and it shows up here."
-				: filter === "stashed"
-					? "Commits you stash show up here."
-					: "Your commits show up here.";
+	const label = TABS.find((tab) => tab.id === filter)?.label ?? "";
+	const { status: statusWord, empty: emptyHint } = COPY[filter];
 
 	return (
 		<div className={`page${menuOpen ? " menu-open" : ""}`}>
@@ -410,27 +218,28 @@ export function App({ user }: { user: AuthUser }) {
 						<button
 							type="button"
 							className="ghost small refresh-icons"
-							disabled={!ready || (!refreshing && bookmarks.length === 0)}
+							disabled={!ready || (!icons.refreshing && bookmarks.length === 0)}
 							aria-label={
-								refreshing
-									? `Stop refetching icons, ${refreshDone} of ${refreshTotal}`
+								icons.refreshing
+									? `Stop refetching icons, ${icons.done} of ${icons.total}`
 									: "Refetch icons"
 							}
 							title={
-								refreshing
+								icons.refreshing
 									? "Stop refetching icons"
 									: "Refetch every commit's icon"
 							}
 							onClick={() => {
-								if (refreshing) {
-									refreshStop.current = true;
-									return;
-								}
-								void refreshIcons();
+								if (icons.refreshing) icons.stop();
+								else void icons.start();
 							}}
 						>
-							{refreshing ? <X size={13} /> : <RefreshCw size={13} />}
-							<span>{refreshing ? `Stop ${refreshDone}/${refreshTotal}` : "Refetch icons"}</span>
+							{icons.refreshing ? <X size={13} /> : <RefreshCw size={13} />}
+							<span>
+								{icons.refreshing
+									? `Stop ${icons.done}/${icons.total}`
+									: "Refetch icons"}
+							</span>
 						</button>
 						<button
 							className="add-btn"
