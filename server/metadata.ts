@@ -82,7 +82,12 @@ function privateHost(hostname: string): boolean {
   if (host === 'localhost' || host.endsWith('.localhost')) return true
   if (host.endsWith('.local') || host.endsWith('.internal')) return true
   if (host === '::1' || host === '0.0.0.0') return true
-  if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80')) return true
+  if (host.includes(':')) {
+    const block = parseInt(host.split(':')[0], 16)
+    if (Number.isNaN(block)) return true
+    if ((block & 0xfe00) === 0xfc00) return true
+    if ((block & 0xffc0) === 0xfe80) return true
+  }
   const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
   if (!v4) return false
   const a = Number(v4[1])
