@@ -16,6 +16,7 @@ import {
   wrapDataKey,
 } from '../lib/crypto'
 import { Avatar } from './Avatar'
+import { PasswordInput } from './PasswordInput'
 import { useStore } from '../lib/store'
 
 const SEED_KEY = 'refs:avatar:seed'
@@ -374,9 +375,8 @@ export function Profile({ compact = false }: { compact?: boolean }) {
 
             <div className="field">
               <label htmlFor="current-password">Current password</label>
-              <input
+              <PasswordInput
                 id="current-password"
-                type="password"
                 value={current}
                 autoComplete="current-password"
                 autoFocus
@@ -389,9 +389,8 @@ export function Profile({ compact = false }: { compact?: boolean }) {
 
             <div className="field">
               <label htmlFor="new-password">New password</label>
-              <input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 value={next}
                 autoComplete="new-password"
                 onChange={(event) => {
@@ -404,9 +403,8 @@ export function Profile({ compact = false }: { compact?: boolean }) {
 
             <div className="field">
               <label htmlFor="confirm-password">Confirm new password</label>
-              <input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirm}
                 autoComplete="new-password"
                 onChange={(event) => {

@@ -6,6 +6,7 @@ import {
 	Circle,
 	Menu,
 	Plus,
+	RefreshCw,
 	Search as SearchIcon,
 	X,
 } from "lucide-react";
@@ -17,6 +18,8 @@ import { Logo } from "./components/Logo";
 import { Profile } from "./components/Profile";
 import { SearchBox } from "./components/SearchBox";
 import { descendantsOf } from "./lib/branches";
+import { shrinkIcon } from "./lib/icon";
+import { readLink } from "./lib/metadata";
 import type { AuthUser } from "./lib/auth";
 import { LOCKUP } from "./lib/brand";
 import { useStore } from "./lib/store";
@@ -56,9 +59,14 @@ export function App({ user }: { user: AuthUser }) {
 	const cancelStash = useStore((s) => s.cancelStash);
 	const confirmId = useStore((s) => s.confirmId);
 	const clearToast = useStore((s) => s.clearToast);
+	const notify = useStore((s) => s.notify);
 
 	const lastRow = useRef<string | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
+	const [refreshDone, setRefreshDone] = useState(0);
+	const [refreshTotal, setRefreshTotal] = useState(0);
+	const refreshStop = useRef(false);
 
 	useEffect(() => {
 		reset();
@@ -228,6 +236,76 @@ export function App({ user }: { user: AuthUser }) {
 		toggleRead,
 	]);
 
+	/**
+	 * Reads every commit again and keeps the new icon. Titles and notes are left
+	 * alone, so this only touches favicons and only writes when one changed.
+	 */
+	const refreshIcons = async () => {
+		if (refreshing) return;
+
+		const targets = useStore.getState().bookmarks.filter((item) => !!item.url);
+		if (targets.length === 0) {
+			notify("No commits to refresh yet.");
+			return;
+		}
+
+		refreshStop.current = false;
+		setRefreshing(true);
+		setRefreshDone(0);
+		setRefreshTotal(targets.length);
+
+		let changed = 0;
+		let failed = 0;
+		let stopped = false;
+
+		for (const [index, item] of targets.entries()) {
+			if (refreshStop.current) {
+				stopped = true;
+				break;
+			}
+
+			try {
+				const data = await readLink(item.url);
+				const icon = data.favicon ? await shrinkIcon(data.favicon) : "";
+				if (icon && icon !== item.favicon) {
+					await useStore.getState().update(item.id, { favicon: icon });
+					changed += 1;
+				}
+			} catch (problem) {
+				const message = problem instanceof Error ? problem.message : "";
+				if (message.startsWith("Too many links")) {
+					stopped = true;
+					break;
+				}
+				failed += 1;
+			}
+
+			setRefreshDone(index + 1);
+
+			// One at a time keeps the server and the sites happy.
+			await new Promise((resolve) => window.setTimeout(resolve, 150));
+		}
+
+		setRefreshing(false);
+
+		if (stopped) {
+			notify(
+				refreshStop.current
+					? `Stopped. ${changed} icons refreshed.`
+					: `Link limit reached. ${changed} icons refreshed, try again later.`,
+			);
+			return;
+		}
+
+		if (failed > 0) {
+			notify(`${changed} icons refreshed, ${failed} could not be read.`);
+		} else if (changed === 0) {
+			notify("All icons are already up to date.");
+		} else {
+			notify(`${changed} icons refreshed.`);
+		}
+	};
+
 	const counts = useMemo(() => {
 		const live = bookmarks.filter((item) => !item.archived);
 		return {
@@ -329,6 +407,31 @@ export function App({ user }: { user: AuthUser }) {
 							</span>
 						</button>
 						<Profile compact />
+						<button
+							type="button"
+							className="ghost small refresh-icons"
+							disabled={!ready || (!refreshing && bookmarks.length === 0)}
+							aria-label={
+								refreshing
+									? `Stop refetching icons, ${refreshDone} of ${refreshTotal}`
+									: "Refetch icons"
+							}
+							title={
+								refreshing
+									? "Stop refetching icons"
+									: "Refetch every commit's icon"
+							}
+							onClick={() => {
+								if (refreshing) {
+									refreshStop.current = true;
+									return;
+								}
+								void refreshIcons();
+							}}
+						>
+							{refreshing ? <X size={13} /> : <RefreshCw size={13} />}
+							<span>{refreshing ? `Stop ${refreshDone}/${refreshTotal}` : "Refetch icons"}</span>
+						</button>
 						<button
 							className="add-btn"
 							title="New commit (C)"
@@ -450,21 +553,39 @@ export function App({ user }: { user: AuthUser }) {
 				</div>
 			</div>
 
-			<nav className="mobile-tabs" aria-label="Filters">
-				{TABS.map(({ id, label: name, icon: Icon }) => (
-					<button
-						key={id}
-						className={!branch && filter === id ? "act" : undefined}
-						onClick={() => {
-							setBranch(null);
-							setFilter(id);
-						}}
-					>
-						<Icon size={18} />
-						<span>{name}</span>
-					</button>
-				))}
-			</nav>
+			<div className="mobile-dock">
+				<nav className="mobile-tabs" aria-label="Filters">
+					{TABS.map(({ id, label: name, icon: Icon }) => {
+						const active = !branch && filter === id;
+						const count = counts[id];
+						return (
+							<button
+								key={id}
+								className={active ? "act" : undefined}
+								aria-current={active ? "page" : undefined}
+								onClick={() => {
+									setBranch(null);
+									setFilter(id);
+								}}
+							>
+								<span className="tab-icon">
+									<Icon size={20} />
+									{count > 0 && <span className="tab-count">{count}</span>}
+								</span>
+								<span className="tab-label">{name}</span>
+							</button>
+						);
+					})}
+				</nav>
+				<button
+					className="dock-search"
+					aria-label="Search commits"
+					title="Search commits"
+					onClick={openSearch}
+				>
+					<SearchIcon size={20} />
+				</button>
+			</div>
 
 			<button
 				className="mobile-commit"

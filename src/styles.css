@@ -11,6 +11,7 @@
 	--soft: #b8b8b8;
 	--faint: #6a6a6a;
 	--accent: #6366f1;
+	--blue: #4f8cff;
 	--green: #22c55e;
 	--red: #ef4444;
 	--xhov: #3a2a2a;
@@ -180,6 +181,7 @@ kbd {
 .top-actions {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 10px;
 	min-width: 0;
 }
@@ -238,7 +240,9 @@ kbd {
 	align-items: center;
 	gap: 9px;
 	flex: 1;
+	max-width: 380px;
 	min-width: 0;
+	margin-right: auto;
 	height: 34px;
 	padding: 0 12px;
 	border: 1px solid transparent;
@@ -440,7 +444,9 @@ kbd {
 .side-mobile-head,
 .mobile-commit,
 .mobile-brand,
-.mobile-tabs {
+.mobile-dock,
+.mobile-tabs,
+.dock-search {
 	display: none;
 }
 .side-branch {
@@ -634,7 +640,7 @@ kbd {
 }
 .collection-title {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	gap: 9px;
 	min-width: 0;
 }
@@ -656,9 +662,18 @@ kbd {
 	font-weight: 500;
 }
 .collection-count {
+	padding: 2px 9px;
+	border: 1px solid var(--line2);
+	border-radius: 999px;
+	background: var(--bg2);
+	color: var(--soft);
 	font-family: var(--mono);
 	font-size: 11px;
-	color: var(--faint);
+	line-height: 1.45;
+}
+.refresh-icons {
+	flex: none;
+	color: var(--muted);
 }
 
 .add-btn {
@@ -1412,6 +1427,36 @@ kbd {
 	background: #2f2f2f;
 	border-color: #4a4a4a;
 }
+.pw {
+	position: relative;
+	display: block;
+}
+.pw input {
+	width: 100%;
+	padding-right: 36px;
+}
+.pw-toggle {
+	position: absolute;
+	top: 50%;
+	right: 5px;
+	display: grid;
+	place-items: center;
+	width: 27px;
+	height: 27px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	transform: translateY(-50%);
+	transition:
+		background 0.13s,
+		color 0.13s;
+}
+.pw-toggle:hover {
+	background: var(--bg2);
+	color: var(--text);
+}
 .auth-submit {
 	align-self: center;
 	min-width: 96px;
@@ -1656,18 +1701,18 @@ kbd {
 		flex: none;
 		margin-left: auto;
 	}
-	/* Phones get the icon only; the field opens the search sheet. */
-	.search-trigger {
+	/* Phones keep the fetch icon only; the dock carries the search. */
+	.top-actions .refresh-icons {
+		order: -1;
 		width: 34px;
 		height: 34px;
-		justify-content: center;
-		gap: 0;
 		padding: 0;
 	}
-	.search-label {
+	.refresh-icons span {
 		display: none;
 	}
-	.search-keys {
+	/* The dock search replaces the field in the header on phones. */
+	.search-trigger {
 		display: none;
 	}
 	.top-actions .add-btn {
@@ -1705,6 +1750,7 @@ kbd {
 		gap: 8px;
 		flex: none;
 		padding-bottom: 14px;
+		border-bottom: 1px solid var(--line);
 	}
 	.top-left .brand {
 		display: none;
@@ -1716,11 +1762,46 @@ kbd {
 		overflow: visible;
 	}
 	.collection-head {
-		position: static;
+		position: sticky;
+		top: 68px;
+		z-index: 30;
 		padding-bottom: 12px;
 	}
 	.side-branch {
 		margin-bottom: 8px;
+	}
+	/* Menu on phones: roomier branch rows, actions always reachable. */
+	.side-head {
+		margin-top: 4px;
+		padding: 0 4px 10px;
+	}
+	.side-label {
+		color: var(--faint);
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+	}
+	.side-branches {
+		padding-top: 2px;
+	}
+	.branch-row {
+		height: 38px;
+		border-radius: 9px;
+	}
+	.branch-row.act {
+		background: #2c2c2c;
+		box-shadow: inset 0 0 0 1px #3d3d3d;
+	}
+	.branch-row.act .branch-hash {
+		color: var(--blue);
+	}
+	.branch-pick {
+		padding-left: 12px;
+		font-size: 13px;
+	}
+	.branch-more {
+		display: grid;
 	}
 	/* Status lives in the bottom bar on phones. */
 	.side-section,
@@ -1733,7 +1814,7 @@ kbd {
 	.mobile-commit {
 		position: fixed;
 		right: 18px;
-		bottom: calc(78px + env(safe-area-inset-bottom));
+		bottom: calc(102px + env(safe-area-inset-bottom));
 		z-index: 50;
 		display: grid;
 		place-items: center;
@@ -1744,51 +1825,97 @@ kbd {
 		color: #fff;
 		box-shadow: 0 14px 30px -12px var(--sh);
 	}
-	.mobile-tabs {
+	.mobile-dock {
 		position: fixed;
-		left: 0;
-		right: 0;
-		bottom: 0;
+		left: 12px;
+		right: 12px;
+		bottom: calc(12px + env(safe-area-inset-bottom));
 		z-index: 45;
-		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+		display: flex;
+		align-items: stretch;
+		gap: 8px;
+	}
+	.mobile-tabs {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		padding: 6px;
+		border: 1px solid var(--line2);
+		border-radius: 999px;
 		background: var(--panel);
-		border-top: 1px solid var(--line);
+		box-shadow:
+			0 18px 42px -18px var(--sh),
+			0 1px 0 rgba(255, 255, 255, 0.04) inset;
 	}
 	.mobile-tabs button {
 		display: flex;
+		flex: 1;
 		flex-direction: column;
 		align-items: center;
-		gap: 3px;
-		margin: 0 2px;
-		padding: 6px 0;
-		border: 1px solid transparent;
-		border-radius: 10px;
+		justify-content: center;
+		gap: 4px;
+		min-width: 0;
+		padding: 7px 4px 6px;
+		border: 0;
+		border-radius: 999px;
 		color: var(--muted);
-		font-size: 10.5px;
+		font-size: 10px;
 		line-height: 1.2;
 		white-space: nowrap;
 		transition:
 			background 0.13s,
-			border-color 0.13s,
 			color 0.13s;
 	}
-	.mobile-tabs button:hover {
-		background: var(--bg2);
-		border-color: var(--line2);
-		color: var(--text);
+	.mobile-tabs button:active {
+		background: #303030;
 	}
 	.mobile-tabs button.act {
-		background: var(--bg3);
-		border-color: var(--line2);
-		color: var(--accent);
+		background: #2c2c2c;
+		box-shadow: inset 0 0 0 1px #3d3d3d;
+		color: var(--blue);
 	}
 	.mobile-tabs button.act svg {
-		color: var(--accent);
+		color: var(--blue);
 	}
-	.mobile-tabs button:active {
-		transform: translateY(1px);
+	.dock-search {
+		display: grid;
+		place-items: center;
+		flex: none;
+		align-self: center;
+		width: 60px;
+		height: 60px;
+		border: 1px solid var(--line2);
+		border-radius: 50%;
+		background: var(--panel);
+		color: var(--soft);
+		box-shadow:
+			0 18px 42px -18px var(--sh),
+			0 1px 0 rgba(255, 255, 255, 0.04) inset;
+	}
+	.dock-search:active {
+		background: var(--bg2);
+	}
+	.tab-icon {
+		position: relative;
+		display: grid;
+		place-items: center;
+	}
+	.tab-count {
+		position: absolute;
+		top: -7px;
+		right: -12px;
+		min-width: 16px;
+		height: 16px;
+		padding: 0 4px;
+		border: 1px solid #3d3d3d;
+		border-radius: 999px;
+		background: var(--bg3);
+		color: var(--soft);
+		font-family: var(--mono);
+		font-size: 9px;
+		font-weight: 600;
+		line-height: 14px;
+		text-align: center;
 	}
 }
 
@@ -1830,7 +1957,7 @@ kbd {
 		padding-right: 34px;
 		touch-action: manipulation;
 	}
-	/* Touch has no hover: a tap shows the dots. */
+	/* Touch has no hover, so the dots follow a press or a tap. */
 	.row-side {
 		position: absolute;
 		right: 4px;
@@ -1852,6 +1979,13 @@ kbd {
 	.row.show-more .row-side .row-more {
 		display: grid;
 		opacity: 1;
+	}
+	/* Reveal the dots while the row is pressed or hovered, never all the time. */
+	.row:hover .row-side .row-more,
+	.row:active .row-side .row-more {
+		display: grid;
+		opacity: 1;
+		pointer-events: auto;
 	}
 	/* The dots open a small text menu under them. */
 	.row.show-acts .row-side,

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Avatar } from '../components/Avatar'
+import { PasswordInput } from '../components/PasswordInput'
 import { BRAND } from '../lib/brand'
 import { messageOf } from '../lib/errors'
 import { useAuth } from '../lib/auth'
@@ -44,8 +45,7 @@ export function Unlock() {
           }}
         >
           <div className="auth-field">
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               autoComplete="current-password"
               autoFocus
