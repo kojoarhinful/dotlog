@@ -260,7 +260,9 @@ export function App({ user }: { user: AuthUser }) {
 					<aside
 						className={`side${menuOpen ? " open" : ""}`}
 						onClick={(event) => {
-							if ((event.target as HTMLElement).closest("button"))
+							// Only picking a branch should close the menu; the action
+							// dots and dialogs keep it open.
+							if ((event.target as HTMLElement).closest(".branch-pick"))
 								setMenuOpen(false);
 						}}
 					>

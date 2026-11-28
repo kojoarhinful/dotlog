@@ -73,6 +73,7 @@ function BranchNode({
   const children = branches.filter((item) => item.parentId === branch.id)
   const selected = active === branch.id
   const [acts, setActs] = useState(false)
+  const [above, setAbove] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -92,7 +93,9 @@ function BranchNode({
     <div className="branch-node">
       <div
         ref={rowRef}
-        className={`branch-row${selected ? ' act' : ''}${acts ? ' show-acts' : ''}`}
+        className={`branch-row${selected ? ' act' : ''}${acts ? ' show-acts' : ''}${
+          above ? ' above' : ''
+        }`}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest('.branch-act')) setActs(false)
         }}
@@ -114,6 +117,7 @@ function BranchNode({
             onClick={() => onAdd(branch.id)}
           >
             <Plus size={12} />
+            <span className="branch-label">New sub-branch</span>
           </button>
           <button
             className="branch-act"
@@ -122,6 +126,7 @@ function BranchNode({
             onClick={() => onEdit(branch.id)}
           >
             <Pencil size={11} />
+            <span className="branch-label">Edit branch</span>
           </button>
           <button
             className="branch-act danger"
@@ -130,6 +135,7 @@ function BranchNode({
             onClick={() => onDelete(branch.id)}
           >
             <Trash2 size={11} />
+            <span className="branch-label">Delete branch</span>
           </button>
         </div>
         <button
@@ -137,7 +143,24 @@ function BranchNode({
           title={`Actions for ${branch.name}`}
           aria-label={`Actions for ${branch.name}`}
           aria-expanded={acts}
-          onClick={() => setActs((value) => !value)}
+          onClick={() => {
+            if (acts) {
+              setActs(false)
+              return
+            }
+            const box = rowRef.current?.getBoundingClientRect()
+            const list = rowRef.current
+              ?.closest('.side-branches')
+              ?.getBoundingClientRect()
+            if (box && list) {
+              const below = list.bottom - box.bottom
+              const above = box.top - list.top
+              setAbove(below < 126 && above > below)
+            } else {
+              setAbove(false)
+            }
+            setActs(true)
+          }}
         >
           <MoreVertical size={13} />
         </button>

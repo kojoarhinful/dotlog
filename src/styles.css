@@ -590,6 +590,10 @@ kbd {
 	border-radius: 6px;
 	color: var(--muted);
 }
+/* Labels only exist for the stacked touch menu. */
+.branch-label {
+	display: none;
+}
 .branch-kids {
 	position: relative;
 	display: flex;
@@ -2049,21 +2053,57 @@ kbd {
 	:is(button, a, input, textarea, select) {
 		touch-action: manipulation;
 	}
-	.branch-acts {
-		position: absolute;
-		top: 50%;
-		right: 28px;
-		transform: translateY(-50%);
-		margin: 0;
-		padding-left: 8px;
-		border-radius: 7px;
+	/* Touch shows the dots only; the actions open as a small menu. */
+	.branch-row:hover .branch-acts,
+	.branch-row:focus-within .branch-acts {
 		opacity: 0;
 		pointer-events: none;
 	}
+	.branch-acts {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		z-index: 12;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0;
+		width: 172px;
+		margin: 0;
+		padding: 4px;
+		border: 1px solid #3a3a3a;
+		border-radius: 10px;
+		background: #262626;
+		box-shadow: 0 14px 30px -10px var(--sh);
+		opacity: 0;
+		pointer-events: none;
+	}
+	.branch-row.above .branch-acts {
+		top: auto;
+		bottom: calc(100% + 4px);
+	}
+	.branch-row.show-acts {
+		z-index: 11;
+	}
 	.branch-row.show-acts .branch-acts {
-		background: #242424;
 		opacity: 1;
 		pointer-events: auto;
+	}
+	.branch-row.show-acts .branch-act {
+		display: flex;
+		width: 100%;
+		height: 36px;
+		justify-content: flex-start;
+		gap: 10px;
+		padding: 0 10px;
+		border-radius: 6px;
+		color: var(--soft);
+		font-size: 13px;
+	}
+	.branch-row.show-acts .branch-act.danger {
+		color: var(--red);
+	}
+	.branch-label {
+		display: inline;
 	}
 	.branch-row.act .branch-more {
 		display: grid;
